@@ -1,0 +1,62 @@
+- name: Setup EKS Workloads
+  hosts: localhost
+
+  gather_facts: no
+  collections:
+  - kubernetes.core
+
+  tasks:
+  - name: "Set k8s namespace state: {{ global_state }}"
+    k8s:
+      name: apps
+      kubeconfig: "{{ kubeconfig_path }}"
+      api_version: v1
+      kind: Namespace
+      state: "{{ global_state }}"
+
+  - name: "wait k8s namespace deleted"
+    when: global_state == "absent"
+    shell: "kubectl wait --for=delete namespace/{{ k8s_namespace }} --timeout=600s"
+
+  - name: deploy test-service
+    when: global_state == "present"
+    helm:
+      name: test-service
+      chart_ref: apps/test-service
+      release_namespace: "{{ k8s_namespace }}"
+
+  - name: deploy cassandra
+    when: global_state == "present"
+    helm:
+      name: cassandra
+      chart_ref: apps/cassandra
+      release_namespace: "{{ k8s_namespace }}"
+
+  - name: wait cassandra created
+    when: global_state == "present"
+    shell: "kubectl get pods -n={{ k8s_namespace }} --selector app.kubernetes.io/name=cassandra --output=jsonpath='{.items[*].metadata.name}'"
+    register: cassandra_pods_created
+    until: item in cassandra_pods_created.stdout
+    retries: 10
+    delay: 30
+    with_items:
+      - cassandra-0
+
+  - name: wait cassandra ready
+    when: global_state == "present"
+    shell: "kubectl wait -n={{ k8s_namespace }} --for=condition=Ready pods --selector statefulset.kubernetes.io/pod-name={{ item }} --timeout=600s"
+    register: cassandra_pods_ready
+    loop:
+      - cassandra-0
+      - cassandra-1
+      - cassandra-2
+
+  - debug: var=cassandra_pods_ready.stdout_lines
+    when: global_state == "present"
+
+  - name: deploy temporal
+    when: global_state == "present"
+    helm:
+      name: temporal
+      chart_ref: apps/temporal
+      release_namespace: "{{ k8s_namespace }}"

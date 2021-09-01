@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+data:
+  ready-probe.sh: |-
+{{ .Files.Get "files/ready-probe.sh" | indent 4 }}

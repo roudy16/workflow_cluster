@@ -1,0 +1,16 @@
+*~
+*.swp
+*.swo
+*.orig
+
+# dev random files
+/.scratch/
+
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+
+# project temp
+plan.tfplan
+
